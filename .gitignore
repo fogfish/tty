@@ -1,0 +1,17 @@
+*.*~
+*.log
+*.aux
+*.beam
+*.dump
+*.tag.gz
+*.tgz
+*.o
+erl_tty
+tests/
+log/
+ebin/
+deps/
+.eunit/
+rebar
+deps.config
+*.sublime-*

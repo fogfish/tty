@@ -1,0 +1,14 @@
+{application, tty,
+   [
+      {description, "erlang serial port node"},
+      {vsn,         "0.0.0"},
+      {modules,     []},
+      {registered,  []},
+      {applications,[
+         kernel
+        ,stdlib
+      ]},
+      %{mod, {tty_app, []}},
+      {env, []}
+   ]
+}.  
