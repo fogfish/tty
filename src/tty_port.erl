@@ -2,9 +2,13 @@
 -behaviour(gen_server).
 
 -export([
-   start_link/1
-  ,start_link/2,
-   init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3
+   start_link/2
+  ,init/1
+  ,terminate/2
+  ,handle_call/3
+  ,handle_cast/2
+  ,handle_info/2,
+  code_change/3
 ]).
 
 -define(DRIVER, erl_tty).
@@ -22,11 +26,11 @@
 %%%
 %%%----------------------------------------------------------------------------   
 
+start_link(undefined, Opts) ->
+   gen_server:start_link(?MODULE, [undefined, Opts], []);
 start_link(Name, Opts) ->
    gen_server:start_link({local, Name}, ?MODULE, [Name, Opts], []).
 
-start_link(Opts) ->
-   gen_server:start_link(?MODULE, [undefined, Opts], []).
 
 init([Name, Opts]) ->
    erlang:process_flag(trap_exit, true),
@@ -61,6 +65,11 @@ terminate(_, S) ->
 
 %%
 %%
+handle_call({bind, Owner, Pid}, _Tx, #srv{owner=Owner}=S) ->
+   {reply, ok, S#srv{owner=Pid}};
+handle_call({bind, _Owner, _Pid}, _Tx, S) ->
+   {reply, {error, not_owner}, S};
+
 handle_call(_, _, S) ->
    {noreply, S}.
 

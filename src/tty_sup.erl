@@ -20,7 +20,7 @@ start_link() ->
 init([]) -> 
    {ok,
       {
-         {simple_one_for_one, 4, 10},
-         [?CHILD(worker, tty_port)]
+         {one_for_one, 4, 10},
+         []
       }
    }.
