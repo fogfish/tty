@@ -12,4 +12,4 @@ typedef struct
 #define NULLTV    ((struct timeval *) 0)
 
 #define PACKET         2
-#define IO_BUFSIZE  4096
+#define IO_BUFSIZE  4100

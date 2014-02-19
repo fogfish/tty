@@ -81,46 +81,56 @@ int open_tty(const char *dev, speed_t baud)
    int fd;
    struct termios tty;
 
-   if ((fd = open(dev, O_RDWR | O_NDELAY )) < 0) //| O_NOCTTY | O_NDELAY
+   if ((fd = open(dev, O_RDWR | O_NOCTTY |  O_NDELAY )) < 0) //| O_NOCTTY | O_NDELAY
       return -1;
 
    /* config port */
-   tcgetattr(fd, &tty);
+   //tcgetattr(fd, &tty);
+   
+  //  tty.c_cc[VMIN]  = 1;  
+  //  tty.c_cc[VTIME] = 0;
+
+  //  tty.c_iflag &= ~(
+  //     ICRNL    |   /* disable CR-to-NL mapping */
+  //     INLCR    |   /* disable NL-to-CR mapping */
+  //     IGNCR    |   /* disable ignore CR */
+  //     ISTRIP   |   /* disable stripping of eighth bit */
+  //     IXON     |   /* disable output flow control */
+  //     BRKINT   |   /* disable generate SIGINT on brk */
+  //     IGNPAR   |
+  //     PARMRK   |
+  //     IGNBRK   |
+  //     INPCK        /* disable input parity detection */
+  //  );    
+
+  //  tty.c_lflag &= ~(
+  //     ICANON   |   /* enable non-canonical mode */
+  //     ECHO     |      disable character echo 
+  //     ECHOE    |    /* disable visual erase */
+  //     ECHOK    |    /* disable echo newline after kill */
+  //     ECHOKE   |   /* disable visual kill with bs-sp-bs */
+  //     ECHONL   |   /* disable echo nl when echo off */
+  //     ISIG     |      /* disable tty-generated signals */
+  //     IEXTEN   /* disable extended input processing */
+  //  );
+  
+  // tty.c_cflag |= CS8;         /* enable eight bit chars */
+  // tty.c_cflag &= ~PARENB;     /* disable input parity check */
+  // tty.c_oflag &= ~OPOST;      /* disable output processing */
+  // tty.c_cflag |= CLOCAL;
+  //  tcsetattr(fd, TCSANOW, &tty);
+
+   bzero(&tty, sizeof(tty));
+   tty.c_cflag = CS8 | CLOCAL | CREAD;
+   tty.c_iflag = IGNPAR | ICRNL;
+   tty.c_oflag = 0;
+
+   tcflush(fd, TCIFLUSH);
+   tcsetattr(fd,TCSANOW,&tty);
+
+
    cfsetispeed(&tty, baud);
    cfsetospeed(&tty, baud);
-   
-   tty.c_cc[VMIN]  = 1;  
-   tty.c_cc[VTIME] = 0;
-
-   tty.c_iflag &= ~(
-      ICRNL    |   /* disable CR-to-NL mapping */
-      INLCR    |   /* disable NL-to-CR mapping */
-      IGNCR    |   /* disable ignore CR */
-      ISTRIP   |   /* disable stripping of eighth bit */
-      IXON     |   /* disable output flow control */
-      BRKINT   |   /* disable generate SIGINT on brk */
-      IGNPAR   |
-      PARMRK   |
-      IGNBRK   |
-      INPCK        /* disable input parity detection */
-   );    
-
-   tty.c_lflag &= ~(
-      ICANON   |   /* enable non-canonical mode */
-      ECHO     |     /* disable character echo */
-      ECHOE    |    /* disable visual erase */
-      ECHOK    |    /* disable echo newline after kill */
-      ECHOKE   |   /* disable visual kill with bs-sp-bs */
-      ECHONL   |   /* disable echo nl when echo off */
-      ISIG     |      /* disable tty-generated signals */
-      IEXTEN   /* disable extended input processing */
-   );
-  
-  tty.c_cflag |= CS8;         /* enable eight bit chars */
-  tty.c_cflag &= ~PARENB;     /* disable input parity check */
-  tty.c_oflag &= ~OPOST;      /* disable output processing */
-  tty.c_cflag |= CLOCAL;
-   tcsetattr(fd, TCSANOW, &tty);
 
    DEBUG("[debug] tty: open device %s\n", dev);
    return fd;
@@ -159,6 +169,10 @@ int erl_recv(int fd, unsigned char buf[], int size)
 
 int main(int argc, char **argv) 
 {
+   DEBUG("[debug] tty: open device %s\n", argv[1]);
+   DEBUG("[debug] tty: open device %s\n", argv[2]);
+
+
    int len     = 0;
    int err     = 0;
    int fd_in   = fileno(stdin);
@@ -177,7 +191,7 @@ int main(int argc, char **argv)
    fd_max = MAX(fd_in, fd_tty);
    FD_ZERO(&io_fds);
 
-   while(err == 0)
+   while(err >= 0)
    {
       FD_SET(fd_in,  &io_fds);
       FD_SET(fd_tty, &io_fds);
@@ -191,13 +205,17 @@ int main(int argc, char **argv)
 
       if (FD_ISSET(fd_tty, &io_fds))
       {
-         DEBUG("[debug] tty: serial fd %i\n", fd_tty);
+         DEBUG("[debug] tty: serial fd %i\n", err);
          FD_CLR(fd_tty, &io_fds);
 
-         len = read(fd_tty, &io[PACKET], IO_BUFSIZE);
-         io[1] = (unsigned char) (len & 0xff);
-         io[0] = (unsigned char) ((len >> 8) & 0xff);
-         write(fd_out, io, len + PACKET);
+         if ( (len = read(fd_tty, &io[PACKET], IO_BUFSIZE) ) == 0)
+         {
+            return -1;
+         } else {
+            io[1] = (unsigned char) (len & 0xff);
+            io[0] = (unsigned char) ((len >> 8) & 0xff);
+            write(fd_out, io, len + PACKET);
+         }
       }
 
       if (FD_ISSET(fd_in, &io_fds))
@@ -205,10 +223,13 @@ int main(int argc, char **argv)
          DEBUG("[debug] tty: erlang fd %i\n", fd_in);
          FD_CLR(fd_in, &io_fds);
 
-         len = erl_recv(fd_in, io, IO_BUFSIZE);
-         write(fd_tty, &io[PACKET], len);
+         if ( (len = erl_recv(fd_in, io, IO_BUFSIZE)) == 0)
+         {
+            return -1;
+         } else {
+            write(fd_tty, &io[PACKET], len);
+         }
       }
-
    }
 
    return 0;
