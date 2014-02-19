@@ -5,7 +5,7 @@
    start_link/1
   ,start_link/2
   ,close/1
-  ,bind/2
+  ,ioctl/3
   ,send/2
   ,recv/2
 ]).
@@ -41,13 +41,11 @@ close(Port) ->
    gen_server:cast(Port, close).
 
 %%
-%% Bind a new process Pid to Port.
-%% The controlling process is the process which receives messages from the port. 
-%% If called by any other process than the current process, {error, not_owner} is returned.
--spec(bind/2 :: (pid(), pid()) -> ok | {error, any()}).
+%% ioctl
+-spec(ioctl/3 :: (pid(), atom(), any()) -> ok | {error, any()}).
 
-bind(Port, Pid) ->
-   gen_server:call(Port, {bind, self(), Pid}).
+ioctl(Port, Req, Val) ->
+   gen_server:call(Port, {ioctl, Req, self(), Val}).
 
 %%
 %% send message to port

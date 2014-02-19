@@ -1,5 +1,6 @@
 
-#define DEBUG(X,Y) fprintf(stderr,X,Y)
+//#define DEBUG(X,Y) fprintf(stderr,X,Y)
+#define DEBUG(X,Y)
 #define ERROR(X,Y) fprintf(stderr,X,Y)
 
 typedef struct 

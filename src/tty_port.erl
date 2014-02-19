@@ -15,8 +15,9 @@
 
 -record(srv, {
    port  = undefined :: any()
-  ,name  = undefined :: atom()  
   ,owner = undefined :: pid()
+  ,size  = undefined :: integer()
+  ,pckt  = undefined :: iolist()
 }).
 
 
@@ -27,12 +28,12 @@
 %%%----------------------------------------------------------------------------   
 
 start_link(undefined, Opts) ->
-   gen_server:start_link(?MODULE, [undefined, Opts], []);
+   gen_server:start_link(?MODULE, [Opts], []);
 start_link(Name, Opts) ->
-   gen_server:start_link({local, Name}, ?MODULE, [Name, Opts], []).
+   gen_server:start_link({local, Name}, ?MODULE, [Opts], []).
 
 
-init([Name, Opts]) ->
+init([Opts]) ->
    erlang:process_flag(trap_exit, true),
    {tty,   TTY} = lists:keyfind(tty,   1, Opts),
    {baud, Baud} = lists:keyfind(baud,  1, Opts),  
@@ -49,8 +50,9 @@ init([Name, Opts]) ->
    {ok, 
       #srv{
          port  = Port
-        ,name  = Name
         ,owner = Pid
+        ,size  = 0
+        ,pckt  = <<>>
       } 
    }.
 
@@ -65,10 +67,13 @@ terminate(_, S) ->
 
 %%
 %%
-handle_call({bind, Owner, Pid}, _Tx, #srv{owner=Owner}=S) ->
+handle_call({ioctl, bind, Owner, Pid}, _Tx, #srv{owner=Owner}=S) ->
    {reply, ok, S#srv{owner=Pid}};
-handle_call({bind, _Owner, _Pid}, _Tx, S) ->
+handle_call({ioctl, bind,_Owner,_Pid}, _Tx, S) ->
    {reply, {error, not_owner}, S};
+
+handle_call({ioctl, packet, _Owner, Size}, _Tx, #srv{}=S) ->
+   {reply, ok, send_message(S#srv.pckt, S#srv{size=Size})};
 
 handle_call(_, _, S) ->
    {noreply, S}.
@@ -88,13 +93,10 @@ handle_cast(_, S) ->
 
 %%
 %%
-handle_info({_Port, {data, Data}}, #srv{name=undefined}=S) ->
-   S#srv.owner ! {tty, self(), Data},
-   {noreply, S};
-
-handle_info({_Port, {data, Data}}, S) ->
-   S#srv.owner ! {tty, S#srv.name, Data},
-   {noreply, S};
+handle_info({_Port, {data, Data}}, #srv{size=0}=S) ->
+   {noreply, send_message(Data, S)};
+handle_info({_Port, {data, Data}},  #srv{pckt=Pckt}=S) ->
+   {noreply, send_message(<<Pckt/binary, Data/binary>>, S)};
 
 handle_info({_Port, {exit_status, 0}}, S) ->
    {stop, normal, S};
@@ -130,7 +132,21 @@ priv_dir() ->
          Priv
    end.
 
-
+%%
+%%
+send_message(<<>>, S) ->
+   S#srv{pckt = <<>>};
+send_message(Msg, #srv{size=0}=S) ->
+   S#srv.owner ! {tty, self(), Msg},
+   S#srv{pckt = <<>>};
+send_message(Msg, #srv{size=Size}=S) ->
+   case Msg of
+      <<Head:Size/binary, Tail/binary>> ->
+         S#srv.owner ! {tty, self(), Head},
+         send_message(Tail, S);
+      _ ->
+         S#srv{pckt=Msg}
+   end.
 
 
 
