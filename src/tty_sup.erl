@@ -1,5 +1,5 @@
 %% @description
-%%    elastic search i/o proxy
+%%
 -module(tty_sup).
 
 -export([
