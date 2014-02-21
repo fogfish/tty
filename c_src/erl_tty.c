@@ -81,56 +81,30 @@ int open_tty(const char *dev, speed_t baud)
    int fd;
    struct termios tty;
 
-   if ((fd = open(dev, O_RDWR | O_NOCTTY |  O_NDELAY )) < 0) //| O_NOCTTY | O_NDELAY
+   if ((fd = open(dev, O_RDWR | O_NOCTTY |  O_NDELAY )) < 0)
       return -1;
 
-   /* config port */
-   //tcgetattr(fd, &tty);
-   
-  //  tty.c_cc[VMIN]  = 1;  
-  //  tty.c_cc[VTIME] = 0;
-
-  //  tty.c_iflag &= ~(
-  //     ICRNL    |   /* disable CR-to-NL mapping */
-  //     INLCR    |   /* disable NL-to-CR mapping */
-  //     IGNCR    |   /* disable ignore CR */
-  //     ISTRIP   |   /* disable stripping of eighth bit */
-  //     IXON     |   /* disable output flow control */
-  //     BRKINT   |   /* disable generate SIGINT on brk */
-  //     IGNPAR   |
-  //     PARMRK   |
-  //     IGNBRK   |
-  //     INPCK        /* disable input parity detection */
-  //  );    
-
-  //  tty.c_lflag &= ~(
-  //     ICANON   |   /* enable non-canonical mode */
-  //     ECHO     |      disable character echo 
-  //     ECHOE    |    /* disable visual erase */
-  //     ECHOK    |    /* disable echo newline after kill */
-  //     ECHOKE   |   /* disable visual kill with bs-sp-bs */
-  //     ECHONL   |   /* disable echo nl when echo off */
-  //     ISIG     |      /* disable tty-generated signals */
-  //     IEXTEN   /* disable extended input processing */
-  //  );
-  
-  // tty.c_cflag |= CS8;         /* enable eight bit chars */
-  // tty.c_cflag &= ~PARENB;     /* disable input parity check */
-  // tty.c_oflag &= ~OPOST;      /* disable output processing */
-  // tty.c_cflag |= CLOCAL;
-  //  tcsetattr(fd, TCSANOW, &tty);
-
-   bzero(&tty, sizeof(tty));
-   tty.c_cflag = CS8 | CLOCAL | CREAD;
-   tty.c_iflag = IGNPAR | ICRNL;
-   tty.c_oflag = 0;
-
-   tcflush(fd, TCIFLUSH);
-   tcsetattr(fd,TCSANOW,&tty);
-
+   /* config port */   
+   tcgetattr(fd, &tty);
 
    cfsetispeed(&tty, baud);
    cfsetospeed(&tty, baud);
+   
+   // 8N1
+   tty.c_cflag &= ~PARENB;
+   tty.c_cflag &= ~CSTOPB;
+   tty.c_cflag &= ~CSIZE;
+   tty.c_cflag |= CS8;
+
+   // no flow control
+   tty.c_cflag &= ~CRTSCTS;
+   tty.c_cflag |= CREAD | CLOCAL;  
+   tty.c_iflag &= ~(IXON | IXOFF | IXANY); 
+
+   // raw
+   tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); 
+   tty.c_oflag &= ~OPOST;
+   tcsetattr(fd,TCSANOW,&tty);
 
    DEBUG("[debug] tty: open device %s\n", dev);
    return fd;
