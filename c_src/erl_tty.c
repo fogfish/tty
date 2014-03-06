@@ -162,7 +162,7 @@ int main(int argc, char **argv)
       return 1;
    }
 
-   fd_max = MAX(fd_in, fd_tty);
+   fd_max = (fd_in > fd_tty) ? fd_in : fd_tty;
    FD_ZERO(&io_fds);
 
    while(err >= 0)
